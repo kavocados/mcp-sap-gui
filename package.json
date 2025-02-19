@@ -1,0 +1,18 @@
+{
+  "name": "mcp-sap-gui",
+  "version": "0.1.0",
+  "description": "MCP server for SAP GUI automation",
+  "type": "module",
+  "main": "src/sap_gui_server/server.js",
+  "scripts": {
+    "start": "node src/sap_gui_server/server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "*",
+    "dotenv": "^16.4.5",
+    "pip": "^0.0.1",
+    "robotjs": "^0.6.0",
+    "screenshot-desktop": "^1.15.0",
+    "winreg": "^1.2.5"
+  }
+}
