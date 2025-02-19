@@ -26,7 +26,19 @@ run.bat full
 ```
 
 4. To use in Cline, set up a MCP configuration like this:
+```
+    "mcp-sap-gui": {
+      "command": "python",
+      "args": [
+        "-m",
+        "sap_gui_server.server"
+      ],
+      "cwd": "PATH_TO_YOUR_FOLDER/mcp-sap-gui",
+      "disabled": false,
+      "autoApprove": []
+    },
 
+```
 5. Use this prompt to explain the Tool to your AI Model:
 ```
 **Important Safety Notice:**
