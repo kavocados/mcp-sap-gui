@@ -7,62 +7,42 @@ A Model Context Protocol (MCP) server for SAP GUI automation.
 - Python 3.8 or higher
 - SAP GUI installed and configured
 - Valid SAP credentials (system, client, user, password)
+- Node.js (for npx)
 
 ## Installation
 
-1. Clone the repository:
+1. Install using build script:
 ```bash
-git clone https://github.com/yourusername/mcp-sap-gui.git
-cd mcp-sap-gui
+build.bat
 ```
-
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-3. For development, install additional dependencies:
-```bash
-pip install -r requirements-dev.txt
-```
-
-4. Configure SAP credentials:
+2. Make sure you have SAP GUI installed, and maintained credentials.env with your Logon Data.
+   
+3. Configure SAP credentials:
 - Copy `credentials.env.example` to `credentials.env`
 - Update the values with your SAP credentials
+
+4. Test server using mcp inspector:
+```bash
+run.bat full
+```
 
 ## Development
 
 ### Running Tests
+1. Test server using mcp inspector:
+```bash
+run.bat full
+```
 
+2. Or use test suite:
 The test suite includes live tests that interact with SAP GUI. Make sure you have SAP GUI installed and configured before running tests.
 
-1. Set up Python path:
-```powershell
-$env:PYTHONPATH = "$env:PYTHONPATH;$(Get-Location)\src"
-```
-
-2. Run tests:
+Run tests:
 ```bash
-pytest tests/ -v
+run.bat test server
 ```
-
-Or use the build script:
-```bash
-.\build.bat
-```
-
-### Test Coverage
 
 The test suite includes:
-- SapController tests (test_sap_controller.py)
-  * Initialization
-  * Transaction launching
-  * Mouse interactions
-  * Keyboard input
-  * Scrolling
-  * Screenshot functionality
-  * Session management
-
 - SapGuiServer tests (test_server.py)
   * Tool registration
   * Request handling
@@ -87,20 +67,8 @@ mcp-sap-gui/
 └── requirements-dev.txt  # Development dependencies
 ```
 
-## Contributing
 
-1. Install development dependencies:
-```bash
-pip install -r requirements-dev.txt
-```
-
-2. Run tests before submitting changes:
-```bash
-.\build.bat
-```
-
-3. Ensure all tests pass and maintain code coverage
 
 ## License
 
-[Your License Here]
+[MIT License]
