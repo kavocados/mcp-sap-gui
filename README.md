@@ -10,8 +10,12 @@ A Model Context Protocol (MCP) server for SAP GUI automation. This server provid
 - Node.js (for npx)
 
 ## Installation
+0. Automated Install using setup script:
+```
+./setup.bat
+```
 
-1. Install using build script:
+1. OR Manual Install using build script..:
 ```bash
 ./build.bat
 ```

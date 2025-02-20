@@ -23,24 +23,27 @@ IF EXIST .env (
 )
 
 REM Ask about integration
-SET /P INTEGRATION="Do you want to integrate with roo, cline, or no integration? (roo/cline/n): "
+SET /P INTEGRATION="Do you want to integrate with roo, cline, or no integration? (roo/cline/all/none): "
 IF /I "%INTEGRATION%"=="roo" (
     call integrate.bat roo
 ) ELSE IF /I "%INTEGRATION%"=="cline" (
     call integrate.bat cline
-) ELSE IF /I "%INTEGRATION%"=="n" (
+) ELSE IF /I "%INTEGRATION%"=="none" (
     echo Skipping integration...
+) ELSE IF /I "%INTEGRATION%"=="all" (
+    call integrate.bat cline
+    call integrate.bat roo
 )
 
 REM Ask about automatic testing
-SET /P AUTO_TEST="Do you want to run automatic tests? (y/n): "
+SET /P AUTO_TEST="Do you want to run automatic tests? (y/n) recommended=n: "
 IF /I "%AUTO_TEST%"=="y" (
     echo Running automatic tests...
     python -m pytest tests/
 )
 
 REM Ask about manual testing
-SET /P MANUAL_TEST="Do you want to run manual testing mode? (y/n): "
+SET /P MANUAL_TEST="Do you want to run manual testing mode? (y/n) recommended=y: "
 IF /I "%MANUAL_TEST%"=="y" (
     call run.bat debug
 )
