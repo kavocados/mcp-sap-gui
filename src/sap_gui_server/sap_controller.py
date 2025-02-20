@@ -64,17 +64,12 @@ def _handle_multiple_logon_popup(process_pid: int) -> Optional[int]:
             visible = win32gui.IsWindowVisible(hwnd)
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
             
-            # Log all windows for debugging
-            # logger.debug(f"Found window - Title: '{title}', Handle: {hwnd}, PID: {pid}, Visible: {visible}")
-            
             # Skip invisible windows
             if not visible:
-                # logger.debug(f"Skipping invisible window: '{title}' (hwnd: {hwnd})")
                 return True
             
             # Skip windows from other processes
             if pid != process_pid:
-                # logger.debug(f"Skipping window from different process: '{title}' (pid: {pid} != {process_pid})")
                 return True
             
             # Log detailed info for our process's windows
@@ -107,7 +102,6 @@ def _handle_multiple_logon_popup(process_pid: int) -> Optional[int]:
 
 def _find_any_sap_window() -> Optional[Any]:
     """Find any SAP GUI window from saplogon.exe process"""
-
     result = []
 
     def enum_windows_callback(hwnd, _):
@@ -117,20 +111,13 @@ def _find_any_sap_window() -> Optional[Any]:
             visible = win32gui.IsWindowVisible(hwnd)
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
 
-            # Log all windows for debugging
-            logger.debug(f"Found window - Title: '{title}', Handle: {hwnd}, PID: {pid}, Visible: {visible}")
-
             # Skip invisible windows
             if not visible:
-                logger.debug(f"Skipping invisible window: '{title}' (hwnd: {hwnd})")
                 return True
 
             try:
                 process = psutil.Process(pid)
                 process_name = process.name().lower()
-
-                # Log process info
-                logger.debug(f"Process info - Name: {process_name}, PID: {pid}")
 
                 # Check if window belongs to saplogon.exe
                 if process_name == 'saplogon.exe':
@@ -140,18 +127,14 @@ def _find_any_sap_window() -> Optional[Any]:
                         result.append(hwnd)
                     else:
                         logger.debug(f"Skipping SAP Logon window: '{title}' (hwnd: {hwnd})")
-                else:
-                    logger.debug(f"Skipping non-saplogon.exe window: '{title}' (process: {process_name})")
 
             except (psutil.NoSuchProcess, psutil.AccessDenied) as e:
                 logger.debug(f"Process access error for window '{title}' (pid: {pid}): {str(e)}")
 
-            # Always continue enumeration
             return True
 
         except Exception as e:
             logger.debug(f"Error checking window {hwnd}: {str(e)}")
-            # Continue enumeration even if there's an error
             return True
 
     try:
@@ -176,10 +159,8 @@ def _find_any_sap_window() -> Optional[Any]:
         logger.error(f"Error during window enumeration: {str(e)}")
         return None
 
-
 def _find_sap_window_integrated(process_pid: int) -> bool:
     """Find the SAP GUI main window, handling the multi-logon popup if needed."""
-
     found_window = False  # Flag to track if we found the window
 
     def enum_windows_callback(hwnd, _):
@@ -190,31 +171,14 @@ def _find_sap_window_integrated(process_pid: int) -> bool:
 
             try:
                 title = win32gui.GetWindowText(hwnd)
-            except Exception as e:
-                logger.error(f"Error getting window title for {hwnd}: {e}")
-                return True
-
-            try:
                 visible = win32gui.IsWindowVisible(hwnd)
-            except Exception as e:
-                logger.error(f"Error checking if window {hwnd} is visible: {e}")
-                return True
-
-            try:
                 _, pid = win32process.GetWindowThreadProcessId(hwnd)
             except Exception as e:
-                logger.error(f"Error getting process ID for window {hwnd}: {e}")
+                logger.error(f"Error getting window info for {hwnd}: {e}")
                 return True
 
-            # Skip invisible windows
-            if not visible:
-                return True
-
-            # Skip windows from other processes
-            if pid != process_pid:
-                return True
-
-            if not title:
+            # Skip invisible windows or windows from other processes
+            if not visible or pid != process_pid or not title:
                 return True
 
             logger.debug(f"Checking window: {title} ({hwnd})")
@@ -235,13 +199,13 @@ def _find_sap_window_integrated(process_pid: int) -> bool:
                 logger.info(f"Found main SAP GUI window: {title}")
                 global _main_window_hwnd
                 _main_window_hwnd = hwnd
-                found_window = True  # Set flag instead of returning False
+                found_window = True
                 logger.debug("Found main window, will continue enumeration")
 
-            return True  # Always continue enumeration
+            return True
 
         except Exception as e:
-            logger.error(f"Error in outer try block of enum_windows_callback: {str(e)}")
+            logger.error(f"Error in enum_windows_callback: {str(e)}")
             return True
 
     start_time = time.time()
@@ -249,32 +213,113 @@ def _find_sap_window_integrated(process_pid: int) -> bool:
         logger.debug(f"Searching for SAP GUI windows for process {process_pid}")
         found_window = False  # Reset flag before each enumeration
         win32gui.EnumWindows(enum_windows_callback, None)
-        if found_window:  # Check if we found the window during enumeration
+        if found_window:
             logger.debug("Main window found, returning True")
             time.sleep(1.0)
             return True
-        time.sleep(0.1)  # Short sleep between attempts
+        time.sleep(0.1)
     logger.warning("Window search timed out after 5 seconds")
     return False
 
-# Load environment variables from credentials.env
-env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'credentials.env')
+# Load environment variables from .env
+env_path = os.path.join(os.path.dirname(__file__), '.env')
 if not load_dotenv(env_path):
-    logger.warning(f"No credentials.env file found at {env_path}")
+    logger.warning(f"No .env file found at {env_path}")
 
 class SapController:
+    # Common SAP GUI UI elements to filter out
+    _UI_ELEMENTS = {
+        "AppToolbar",
+        "Custom Container",
+        "Control Container",
+        "SAP's Advanced Treelist"
+    }
+
     def __init__(self):
         self._initialized = False
         self._dpi_scale = _get_dpi_scale()
         self._current_process = None
-        self._main_window_hwnd = None  # Initialize the main window handle
-        self._current_process = None
-        # self._main_window_hwnd = None  # Initialize the main window handle, now global
-        # self._popup_hwnd = None # now global
         logger.debug("SapController initialized")
 
+    def _get_window_text(self) -> Dict[str, Any]:
+        """Get text content from SAP GUI window and its child windows.
+        
+        Returns:
+            Dict containing:
+            - main_text: Primary window text
+            - error_messages: List of detected error messages
+            - status_messages: List of status messages
+            - field_values: Dict of field labels and values
+        """
+        logger.debug("Getting window text content")
+        
+        result = {
+            "main_text": "",
+            "error_messages": [],
+            "status_messages": [],
+            "field_values": {}
+        }
+        
+        try:
+            # Ensure SAP window is active
+            self._ensure_sap_window_active()
+            
+            # Get main window text
+            global _main_window_hwnd
+            main_text = win32gui.GetWindowText(_main_window_hwnd)
+            result["main_text"] = main_text
+            
+            # Helper function to process child windows
+            def enum_child_callback(hwnd, _):
+                try:
+                    # Get text from this child window
+                    text = win32gui.GetWindowText(hwnd)
+                    
+                    # Skip empty text or common UI elements
+                    if not text or text in self._UI_ELEMENTS:
+                        return True
+                    
+                    # Check for error messages
+                    if any(err in text.lower() for err in ["error", "does not exist", "invalid", "failed"]):
+                        result["error_messages"].append(text)
+                    # Check for status messages
+                    elif any(status in text.lower() for status in ["success", "completed", "processed"]):
+                        result["status_messages"].append(text)
+                    # Store other text as potential field values
+                    elif ":" in text:
+                        label, value = text.split(":", 1)
+                        result["field_values"][label.strip()] = value.strip()
+                    
+                    return True
+                except Exception as e:
+                    logger.debug(f"Error processing child window {hwnd}: {str(e)}")
+                    return True
+            
+            # Enumerate all child windows
+            win32gui.EnumChildWindows(_main_window_hwnd, enum_child_callback, None)
+            
+            logger.debug("Window text content retrieved successfully")
+            return result
+            
+        except Exception as e:
+            logger.error(f"Failed to get window text: {str(e)}")
+            raise Exception(f"Failed to get window text: {str(e)}")
+
+    def _is_window_active(self, hwnd: int) -> bool:
+        """Check if the given window is currently active"""
+        return win32gui.GetForegroundWindow() == hwnd
+
+    def _wait_for_window_activation(self, hwnd: int, timeout: float = 0.5) -> bool:
+        """Wait for window to become active with timeout"""
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            if self._is_window_active(hwnd):
+                return True
+            time.sleep(0.1)
+        return False
+
     def _ensure_sap_window_active(self) -> None:
-        """Ensure SAP GUI window is active, restored, and maximized"""
+        """Ensure SAP GUI window is active, restored, and maximized using a three-tier approach"""
         logger.debug("Ensuring SAP GUI window is active and maximized")
 
         try:
@@ -294,60 +339,57 @@ class SapController:
             title = win32gui.GetWindowText(hwnd)
             logger.debug(f"Found SAP window: {title}")
 
-            # Get window placement info
+            # Get window placement info and restore if minimized
             placement = win32gui.GetWindowPlacement(hwnd)
-
-            # Restore if minimized
             if placement[1] == win32con.SW_SHOWMINIMIZED:
                 logger.debug("Window is minimized, restoring...")
                 win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
-                time.sleep(0.5)
+                time.sleep(0.2)
 
             # Maximize window
             logger.debug("Maximizing window...")
             win32gui.ShowWindow(hwnd, win32con.SW_MAXIMIZE)
-            time.sleep(0.5)
+            time.sleep(0.2)
 
-            # Force window to foreground
-            logger.debug("Bringing window to foreground...")
+            # Tier 1: Try BringWindowToTop
+            logger.debug("Tier 1: Attempting BringWindowToTop")
+            win32gui.BringWindowToTop(hwnd)
+            if self._wait_for_window_activation(hwnd, 0.5):
+                logger.debug("Window activated successfully with BringWindowToTop")
+                return
+
+            # Tier 2: Try Windows Messages
+            logger.debug("Tier 2: Attempting Windows Messages")
+            win32gui.PostMessage(hwnd, win32con.WM_SYSCOMMAND, win32con.SC_RESTORE, 0)
+            win32gui.PostMessage(hwnd, win32con.WM_ACTIVATE, win32con.WA_ACTIVE, 0)
+            if self._wait_for_window_activation(hwnd, 0.5):
+                logger.debug("Window activated successfully with Windows Messages")
+                return
+
+            # Tier 3: Fallback to SetForegroundWindow with ALT key
+            logger.debug("Tier 3: Falling back to SetForegroundWindow with ALT key")
             shell = win32com.client.Dispatch("WScript.Shell")
             shell.SendKeys('%')  # Alt key to allow SetForegroundWindow
             win32gui.SetForegroundWindow(hwnd)
-
-            # Verify window is active with timeout
-            start_time = time.time()
-            timeout = 2  # Maximum wait time in seconds
-
-            while time.time() - start_time < timeout:
-                if win32gui.GetForegroundWindow() == hwnd:
-                    logger.debug("Window successfully activated")
-                    break
-                logger.debug("Window not active yet, retrying activation...")
-                shell.SendKeys('%')  # Alt key to allow SetForegroundWindow
-                win32gui.SetForegroundWindow(hwnd)
-                time.sleep(0.1)  # Short sleep between attempts
-
-            if win32gui.GetForegroundWindow() != hwnd:
-                logger.warning("Failed to activate window after timeout")
+            
+            if not self._wait_for_window_activation(hwnd, 1.0):
+                logger.warning("Failed to activate window after all attempts")
             else:
-                logger.debug("SAP GUI window is now active and maximized")
+                logger.debug("Window activated successfully with SetForegroundWindow")
 
         except Exception as e:
             logger.error(f"Failed to ensure SAP window is active: {str(e)}")
             raise Exception(f"Failed to activate SAP window: {str(e)}")
-    
+
     def _handle_multiple_logon_popup(self) -> None:
         """Handle the multiple logon popup by selecting the second option"""
         logger.info("Checking for multiple logon popup...")
-
-        # This function is now only called from within _find_sap_window_integrated,
-        # so we can assume that _popup_hwnd is already set.
 
         try:
             global _popup_hwnd
             if not _popup_hwnd:
                 logger.error("No popup window handle available")
-                return  # Should not happen, but handle for safety
+                return
 
             hwnd = _popup_hwnd
 
@@ -373,7 +415,7 @@ class SapController:
                     break
 
                 logger.debug("multilogon Popup window not active yet, retrying activation...")
-                time.sleep(0.1)  # Short sleep between attempts
+                time.sleep(0.1)
 
             if win32gui.GetForegroundWindow() != hwnd:
                 logger.warning("Failed to activate multilogon popup window after timeout")
@@ -387,7 +429,7 @@ class SapController:
             height = rect[3] - rect[1]
             click_x = width // 2  # Center horizontally
             click_y = int(height * 0.38)  # 38% from top
-            logger.debug(f"Clicking at position ({click_x}, {click_y}) in multilogon  window of size {width}x{height}")
+            logger.debug(f"Clicking at position ({click_x}, {click_y}) in multilogon window of size {width}x{height}")
 
             # Click at calculated position
             self._click_with_dpi_scaling(hwnd, click_x, click_y, check_bounds=False)
@@ -395,7 +437,7 @@ class SapController:
             # Press Enter to confirm
             shell = win32com.client.Dispatch("WScript.Shell")
             shell.SendKeys('~')  # Enter key
-            time.sleep(1)  # further reduced
+            time.sleep(1)
 
             logger.info("Multiple logon popup handled successfully")
 
@@ -406,14 +448,12 @@ class SapController:
     def _get_sapgui_path(self) -> str:
         """Get SAP GUI installation path from registry or default location"""
         try:
-            # Try to get path from registry
             with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SOFTWARE\WOW6432Node\SAP\SAPGUIFrontend") as key:
                 install_path = winreg.QueryValueEx(key, "InstallationPath")[0]
                 logger.debug(f"Found SAP GUI path in registry: {install_path}")
                 return install_path
         except WindowsError as e:
             logger.warning(f"Could not read SAP GUI path from registry: {str(e)}")
-            # Fall back to default path
             default_path = r"C:\Program Files\SAP\FrontEnd\SAPGUI"
             logger.debug(f"Using default SAP GUI path: {default_path}")
             return default_path
@@ -472,7 +512,6 @@ class SapController:
             saplogon_process = None
             
             while time.time() - start_time < timeout:
-                import psutil
                 saplogon_processes = [p for p in psutil.process_iter(['pid', 'name']) 
                                     if p.info['name'].lower() == 'saplogon.exe']
                 if saplogon_processes:
@@ -492,10 +531,10 @@ class SapController:
             
             # Find the main SAP window (and handle popup if necessary)
             if _find_sap_window_integrated(self._current_process.pid):
-                logger.debug(f"taking screenshot!")
-                # add small delay
+                logger.debug("Taking screenshot")
                 time.sleep(0.5)
-                # Take screenshot
+                
+                # Return just the screenshot
                 screenshot = self._take_screenshot()
                 return {
                     "image": screenshot
@@ -611,15 +650,24 @@ class SapController:
             raise Exception(f"Failed to move mouse: {str(e)}")
         
     def type_text(self, text: str) -> Dict[str, Any]:
-        """Type text at current cursor position"""
-        logger.debug(f"Typing text: {text}")
+        """Type text at current cursor position. Supports special keys using SendKeys syntax:
+        - Enter: ~ or {ENTER}
+        - Tab: {TAB}
+        - Function keys: {F1} through {F16}
+        - Arrow keys: {UP}, {DOWN}, {LEFT}, {RIGHT}
+        - Other special keys: {ESC}, {BACKSPACE}, {DELETE}
+        
+        Example: "Hello{TAB}World~" types "Hello", then TAB, then "World", then ENTER
+        """
+        logger.debug(f"Typing text with special keys: {text}")
 
         try:
             # Ensure SAP window is active before typing
             self._ensure_sap_window_active()
             
-            # Type text, using the stored main window handle
-            pyautogui.typewrite(text)
+            # Use WScript.Shell for SendKeys
+            shell = win32com.client.Dispatch("WScript.Shell")
+            shell.SendKeys(text)
             time.sleep(0.5)
 
             response = {
@@ -670,7 +718,6 @@ class SapController:
             raise
 
     def _take_screenshot(self) -> str:
-    # def _take_screenshot(self) -> Image:
         """Take screenshot of the active window with cursor and return as base64"""
         try:
             # Get active window
@@ -688,17 +735,13 @@ class SapController:
             
             # Take screenshot with cursor
             with mss() as sct:
-                # Capture with cursor
                 screenshot = sct.grab(monitor)
-                # Convert to PIL Image
                 img = Image.frombytes("RGB", screenshot.size, screenshot.rgb)
             
             # Convert to base64
             buffer = BytesIO()
             img.save(buffer, format="PNG")
             base64string = base64.b64encode(buffer.getvalue()).decode()
-            # logger.debug(f"Screenshot Base64: {base64string}" )
-            # return img
             return base64string
             
         except Exception as e:

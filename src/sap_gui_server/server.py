@@ -38,18 +38,54 @@ class SapGuiServer:
         
     def _setup_handlers(self):
         """Set up request handlers for MCP tools"""
+        
+        def handle_image_response(result, experimental=False):
+            """Handle image response based on experimental flag"""
+            if experimental:
+                # Return sequence of content objects
+                return [
+                    types.ImageContent(type="image", data=result["image"], mimeType="image/png"),
+                    types.TextContent(type="text", text=f"data:image/png;base64,{result['image']}")  # Raw base64
+                ]
+            else:
+                # Return sequence with embedded resource
+                return [
+                    types.EmbeddedResource(
+                        type="resource",
+                        resource=types.TextResourceContents(
+                            uri="application:image",
+                            mimeType="image/png",
+                            text=f"data:image/png;base64,{result['image']}"
+                        )
+                    )
+                ]                                            
+                # )
+                # else:
+                
+                # # Industry standard format
+                # return [{
+                #     "type": "image_url",
+                #     "data": {"url": f"data:image/png;base64,{result['image']}"},
+                #     "mimeType": "image/png"
+                # }]
+
         # Define handlers
         async def handle_list_tools() -> list[types.Tool]:
             return [
                 types.Tool(
                     name="launch_transaction",
-                    description="Launch SAP transaction code",
+                    description="Launch SAP transaction code and return a screenshot of the resulting screen",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "transaction": {
                                 "type": "string",
-                                "description": "Transaction code (e.g. VA01)"
+                                "description": "SAP transaction code to launch (e.g. VA01, ME21N, MM03)"
+                            },
+                            "experimental": {
+                                "type": "boolean",
+                                "description": "Use experimental MCP format for screenshot response",
+                                "default": False
                             }
                         },
                         "required": ["transaction"]
@@ -57,17 +93,22 @@ class SapGuiServer:
                 ),
                 types.Tool(
                     name="sap_click",
-                    description="Click at specific coordinates",
+                    description="Click at specific coordinates and return a screenshot of the resulting screen",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "x": {
                                 "type": "integer",
-                                "description": "X coordinate"
+                                "description": "Horizontal pixel coordinate (0-1920) where the click should occur"
                             },
                             "y": {
                                 "type": "integer",
-                                "description": "Y coordinate"
+                                "description": "Vertical pixel coordinate (0-1080) where the click should occur"
+                            },
+                            "experimental": {
+                                "type": "boolean",
+                                "description": "Use experimental MCP format for screenshot response",
+                                "default": False
                             }
                         },
                         "required": ["x", "y"]
@@ -75,17 +116,22 @@ class SapGuiServer:
                 ),
                 types.Tool(
                     name="sap_move_mouse",
-                    description="Move mouse to specific coordinates",
+                    description="Move mouse cursor to specific coordinates and return a screenshot of the screen",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "x": {
                                 "type": "integer",
-                                "description": "X coordinate"
+                                "description": "Horizontal pixel coordinate (0-1920) to move the cursor to"
                             },
                             "y": {
                                 "type": "integer",
-                                "description": "Y coordinate"
+                                "description": "Vertical pixel coordinate (0-1080) to move the cursor to"
+                            },
+                            "experimental": {
+                                "type": "boolean",
+                                "description": "Use experimental MCP format for screenshot response",
+                                "default": False
                             }
                         },
                         "required": ["x", "y"]
@@ -93,13 +139,18 @@ class SapGuiServer:
                 ),
                 types.Tool(
                     name="sap_type",
-                    description="Type text at current cursor position",
+                    description="Type text at current cursor position and return a screenshot of the resulting screen",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "text": {
                                 "type": "string",
-                                "description": "Text to type"
+                                "description": "Text to enter at the current cursor position in the SAP GUI window"
+                            },
+                            "experimental": {
+                                "type": "boolean",
+                                "description": "Use experimental MCP format for screenshot response",
+                                "default": False
                             }
                         },
                         "required": ["text"]
@@ -107,14 +158,19 @@ class SapGuiServer:
                 ),
                 types.Tool(
                     name="sap_scroll",
-                    description="Scroll SAP GUI screen",
+                    description="Scroll the SAP GUI screen and return a screenshot of the resulting view",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "direction": {
                                 "type": "string",
                                 "enum": ["up", "down"],
-                                "description": "Scroll direction"
+                                "description": "Direction to scroll the screen ('up' moves content down, 'down' moves content up)"
+                            },
+                            "experimental": {
+                                "type": "boolean",
+                                "description": "Use experimental MCP format for screenshot response",
+                                "default": False
                             }
                         },
                         "required": ["direction"]
@@ -122,7 +178,7 @@ class SapGuiServer:
                 ),
                 types.Tool(
                     name="end_transaction",
-                    description="End current SAP transaction",
+                    description="End the current SAP transaction and close the window",
                     inputSchema={
                         "type": "object",
                         "properties": {}
@@ -130,13 +186,18 @@ class SapGuiServer:
                 ),
                 types.Tool(
                     name="save_last_screenshot",
-                    description="Save the last captured screenshot",
+                    description="Save the last captured screenshot to a file",
                     inputSchema={
                         "type": "object",
                         "properties": {
                             "filename": {
                                 "type": "string",
-                                "description": "Filename to save the screenshot"
+                                "description": "Path where the screenshot will be saved (e.g. 'screenshot.png', supports PNG, JPG, BMP formats)"
+                            },
+                            "experimental": {
+                                "type": "boolean",
+                                "description": "Use experimental MCP format for screenshot response",
+                                "default": False
                             }
                         },
                         "required": ["filename"]
@@ -158,17 +219,33 @@ class SapGuiServer:
                     logger.info(f"Launching transaction: {arguments['transaction']}")
                     result = sap.launch_transaction(arguments["transaction"])
                     
-                    if "status" in result:
-                        status_text = f"Status: {result['status']}"
-                        if "message" in result:
-                            status_text += f"\\n{result['message']}"
-                        logger.info(f"Tool execution result - {status_text}")
+                    # Get window text first
+                    window_text = sap._get_window_text()
+                    
+                    # Add error messages if any
+                    if window_text["error_messages"]:
+                        error_text = "Errors: " + ", ".join(window_text["error_messages"])
+                        logger.info(f"Error messages detected: {error_text}")
+                        content.append(types.TextContent(type="text", text=error_text))
+                    
+                    # Add status messages if any
+                    if window_text["status_messages"]:
+                        status_text = "Status: " + ", ".join(window_text["status_messages"])
+                        logger.info(f"Status messages detected: {status_text}")
                         content.append(types.TextContent(type="text", text=status_text))
-                        
+                    
+                    # Add field values if any
+                    if window_text["field_values"]:
+                        fields_text = "Fields:\n" + "\n".join(f"{k}: {v}" for k, v in window_text["field_values"].items())
+                        logger.info(f"Field values detected: {fields_text}")
+                        content.append(types.TextContent(type="text", text=fields_text))
+                    
+                    # Add screenshot if available
                     if "image" in result and result["image"]:
                         logger.info("Screenshot captured in response")
                         self.last_screenshot = result["image"]
-                        content.append(types.ImageContent(type="image", data=result["image"], mimeType="image/png"))
+                        experimental = arguments.get("experimental", False)
+                        content.extend(handle_image_response(result, experimental))
                         
                 elif name == "sap_click":
                     # Extract and validate coordinates
@@ -189,7 +266,8 @@ class SapGuiServer:
                     if "image" in result and result["image"]:
                         logger.info("Screenshot captured in response")
                         self.last_screenshot = result["image"]
-                        content.append(types.ImageContent(type="image", data=result["image"], mimeType="image/png"))
+                        experimental = arguments.get("experimental", False)
+                        content.extend(handle_image_response(result, experimental))
 
                 elif name == "sap_move_mouse":
                     logger.info(f"Moving mouse to: ({arguments['x']}, {arguments['y']})")
@@ -203,7 +281,8 @@ class SapGuiServer:
                     if "image" in result and result["image"]:
                         logger.info("Screenshot captured in response")
                         self.last_screenshot = result["image"]
-                        content.append(types.ImageContent(type="image", data=result["image"], mimeType="image/png"))
+                        experimental = arguments.get("experimental", False)
+                        content.extend(handle_image_response(result, experimental))
                 elif name == "sap_type":
                     logger.info(f"Typing text: {arguments['text']}")
                     result = sap.type_text(arguments["text"])
@@ -216,7 +295,8 @@ class SapGuiServer:
                     if "image" in result and result["image"]:
                         logger.info("Screenshot captured in response")
                         self.last_screenshot = result["image"]
-                        content.append(types.ImageContent(type="image", data=result["image"], mimeType="image/png"))
+                        experimental = arguments.get("experimental", False)
+                        content.extend(handle_image_response(result, experimental))
                         
                 elif name == "sap_scroll":
                     logger.info(f"Scrolling screen: {arguments['direction']}")
@@ -230,7 +310,8 @@ class SapGuiServer:
                     if "image" in result and result["image"]:
                         logger.info("Screenshot captured in response")
                         self.last_screenshot = result["image"]
-                        content.append(types.ImageContent(type="image", data=result["image"], mimeType="image/png"))
+                        experimental = arguments.get("experimental", False)
+                        content.extend(handle_image_response(result, experimental))
                         
                 elif name == "end_transaction":
                     logger.info("Ending transaction")

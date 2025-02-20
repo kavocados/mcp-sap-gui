@@ -13,20 +13,32 @@ A Model Context Protocol (MCP) server for SAP GUI automation. This server provid
 
 1. Install using build script:
 ```bash
-build.bat
+./build.bat
 ```
 
 2. Configure SAP credentials:
-- Copy `credentials.env.example` to `credentials.env`
+- Copy `credentials.env.example` to `.env`
 - Update the values with your SAP credentials
 
 3. Test server using mcp inspector:
 ```bash
-run.bat full
+./run.bat debug
 ```
 
-4. To use in Cline, set up a MCP configuration like this:
+4. Use the integration script to automatically configure MCP settings:
+```bash
+./integrate.bat cline  # Configure for Cline
+./integrate.bat roo    # Configure for Roo
 ```
+
+The script will:
+- Automatically determine the correct settings file path
+- Create a backup before making any changes
+- Safely update the MCP configuration
+- Validate changes to prevent corruption
+
+Manual Configuration (if needed):
+```json
     "mcp-sap-gui": {
       "command": "python",
       "args": [
@@ -36,8 +48,7 @@ run.bat full
       "cwd": "PATH_TO_YOUR_FOLDER/mcp-sap-gui",
       "disabled": false,
       "autoApprove": []
-    },
-
+    }
 ```
 5. Use this prompt to explain the Tool to your AI Model:
 ```
@@ -100,13 +111,52 @@ The MCP SAP GUI Server provides the following tools for SAP automation:
 ### Screen Capture
 - `save_last_screenshot`: Save the last captured screenshot of the SAP GUI window
 
+### Image Response Formats
+
+All tools that interact with the SAP GUI window (launch_transaction, sap_click, sap_move_mouse, sap_type, sap_scroll, save_last_screenshot) return screenshots and support two response formats controlled by the `experimental` boolean parameter:
+
+1. Industry Standard Format, used in Cline, Claude, Grok AI, etc. (Default, `experimental=false`):
+```json
+{
+    "type": "image_url",
+    "image_url": {
+        "url": "data:image/png;base64,..."
+    }
+}
+```
+
+2. MCP Format (Experimental, `experimental=true`):
+```python
+[
+    ImageContent(type="image", data="...", mimeType="image/png"),
+    TextContent(type="text", text="...")  # Raw base64 string
+]
+```
+
+Example usage:
+```python
+# Industry standard format (default)
+result = await client.call_tool("launch_transaction", {
+    "transaction": "VA01",
+    "experimental": false  # or omit for default
+})
+
+# MCP format + raw base64
+result = await client.call_tool("launch_transaction", {
+    "transaction": "VA01",
+    "experimental": true
+})
+```
+
+Note: The `experimental` parameter is a boolean toggle, not a string. Use `true`/`false` in JSON or `True`/`False` in Python.
+
 ## Development
 
 ### Running Tests
 
-1. Test server using mcp inspector:
+1. Test server using mcp inspector (build + debug):
 ```bash
-run.bat full
+./run.bat full
 ```
 
 2. Or use test suite:
@@ -138,6 +188,8 @@ mcp-sap-gui/
 │   ├── test_sap_controller.py
 │   └── test_server.py
 ├── build.bat          # Build and test script
+├── integrate.bat      # Integration script for Cline/Roo
+├── integrate.py       # Python script for safe MCP settings updates
 ├── requirements.txt   # Production dependencies
 └── requirements-dev.txt  # Development dependencies
 ```
