@@ -11,21 +11,32 @@ import mcp.types as types
 
 from sap_gui_server.sap_controller import SapController
 
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+def get_log_level(env_var, default_level):
+    """Get logging level from environment variable"""
+    level = os.getenv(env_var, default_level)
+    return getattr(logging, level.upper(), getattr(logging, default_level))
+
 # Configure logging
 logging.basicConfig(
-    level=logging.ERROR,
+    level=get_log_level('LOG_LEVEL', 'ERROR'),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[logging.StreamHandler(sys.stderr)]
 )
 
 # Configure module loggers
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logger.setLevel(get_log_level('SERVER_LOG_LEVEL', 'DEBUG'))
 
 # Set third-party loggers
-logging.getLogger('mcp').setLevel(logging.WARNING)
-logging.getLogger('asyncio').setLevel(logging.WARNING)
-logging.getLogger('sap_gui_server.sap_controller').setLevel(logging.DEBUG)
+logging.getLogger('mcp').setLevel(get_log_level('MCP_LOG_LEVEL', 'WARNING'))
+logging.getLogger('asyncio').setLevel(get_log_level('ASYNCIO_LOG_LEVEL', 'WARNING'))
+logging.getLogger('sap_gui_server.sap_controller').setLevel(get_log_level('SAP_CONTROLLER_LOG_LEVEL', 'DEBUG'))
 
 class SapGuiServer:
     def __init__(self):
@@ -40,7 +51,7 @@ class SapGuiServer:
     def _setup_handlers(self):
         """Set up request handlers for MCP tools"""
         
-        def handle_image_response(result, return_screenshot="none"):
+        def handle_image_response(result, return_screenshot="none", arguments=None):
             """Handle image response based on return_screenshot mode"""
             # Validate return_screenshot parameter
             valid_modes = ["none", "as_file", "as_base64", "as_imagecontent", "as_imageurl"]
@@ -56,21 +67,40 @@ class SapGuiServer:
             if return_screenshot == "none":
                 return []
             elif return_screenshot == "as_file":
-                # Save to temp file and return path
-                import tempfile
-                temp_dir = tempfile.gettempdir()
-                filename = os.path.join(temp_dir, "sap_screenshot.png")
-                
+                from datetime import datetime
                 from PIL import Image
                 import base64
                 from io import BytesIO
                 
+                # Get target folder path
+                target_folder = arguments.get("as_file_target_folder")
+                if not target_folder:
+                    logger.error("Target folder path is required when using 'as_file' return format")
+                    return [types.TextContent(type="text", text="Error: Target folder path is required when using 'as_file' return format")]
+                
+                # Create target folder if it doesn't exist
+                try:
+                    os.makedirs(target_folder, exist_ok=True)
+                except Exception as e:
+                    error_msg = f"Failed to create target folder: {str(e)}"
+                    logger.error(error_msg)
+                    return [types.TextContent(type="text", text=f"Error: {error_msg}")]
+                
+                # Check if folder is writable
+                if not os.access(target_folder, os.W_OK):
+                    error_msg = f"Target folder is not writable: {target_folder}"
+                    logger.error(error_msg)
+                    return [types.TextContent(type="text", text=f"Error: {error_msg}")]
+                
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                filename = f"sap_screenshot_{timestamp}.png"
+                full_path = os.path.join(target_folder, filename)
+                
                 image_data = base64.b64decode(result["image"])
                 image = Image.open(BytesIO(image_data))
-                image.save(filename)
-                absolute_path = os.path.abspath(filename)
+                image.save(full_path)
                 
-                return [types.TextContent(type="text", text=f"Screenshot saved as {absolute_path}")]
+                return [types.TextContent(type="text", text=f"Screenshot saved as {full_path}")]
             elif return_screenshot == "as_base64":
                 return [types.TextContent(type="text", text=result["image"])]
             elif return_screenshot == "as_imagecontent":
@@ -97,6 +127,15 @@ class SapGuiServer:
                 "default": "none"
             }
             
+            # Common properties for all tools that can return screenshots
+            screenshot_properties = {
+                "return_screenshot": screenshot_schema,
+                "as_file_target_folder": {
+                    "type": "string",
+                    "description": "Target folder path for saving screenshots when using 'as_file' return format. Will be created if it doesn't exist."
+                }
+            }
+            
             return [
                 types.Tool(
                     name="launch_transaction",
@@ -108,7 +147,7 @@ class SapGuiServer:
                                 "type": "string",
                                 "description": "SAP transaction code to launch (e.g. VA01, ME21N, MM03)"
                             },
-                            "return_screenshot": screenshot_schema
+                            **screenshot_properties
                         },
                         "required": ["transaction"]
                     }
@@ -127,7 +166,7 @@ class SapGuiServer:
                                 "type": "integer",
                                 "description": "Vertical pixel coordinate (0-1080) where the click should occur"
                             },
-                            "return_screenshot": screenshot_schema
+                            **screenshot_properties
                         },
                         "required": ["x", "y"]
                     }
@@ -146,7 +185,7 @@ class SapGuiServer:
                                 "type": "integer",
                                 "description": "Vertical pixel coordinate (0-1080) to move the cursor to"
                             },
-                            "return_screenshot": screenshot_schema
+                            **screenshot_properties
                         },
                         "required": ["x", "y"]
                     }
@@ -161,7 +200,7 @@ class SapGuiServer:
                                 "type": "string",
                                 "description": "Text to enter at the current cursor position in the SAP GUI window"
                             },
-                            "return_screenshot": screenshot_schema
+                            **screenshot_properties
                         },
                         "required": ["text"]
                     }
@@ -177,7 +216,7 @@ class SapGuiServer:
                                 "enum": ["up", "down"],
                                 "description": "Direction to scroll the screen ('up' moves content down, 'down' moves content up)"
                             },
-                            "return_screenshot": screenshot_schema
+                            **screenshot_properties
                         },
                         "required": ["direction"]
                     }
@@ -252,7 +291,7 @@ class SapGuiServer:
                     # Add screenshot based on return mode
                     if "image" in result:
                         logger.info("Screenshot captured in response")
-                        content.extend(handle_image_response(result, return_screenshot))
+                        content.extend(handle_image_response(result, return_screenshot, arguments))
 
                 elif name == "sap_click":
                     # Extract and validate coordinates
@@ -272,7 +311,7 @@ class SapGuiServer:
                         content.append(types.TextContent(type="text", text=status_text))
                     if "image" in result:
                         logger.info("Screenshot captured in response")
-                        content.extend(handle_image_response(result, return_screenshot))
+                        content.extend(handle_image_response(result, return_screenshot, arguments))
 
                 elif name == "sap_move_mouse":
                     logger.info(f"Moving mouse to: ({arguments['x']}, {arguments['y']})")
@@ -285,7 +324,7 @@ class SapGuiServer:
                         content.append(types.TextContent(type="text", text=status_text))
                     if "image" in result:
                         logger.info("Screenshot captured in response")
-                        content.extend(handle_image_response(result, return_screenshot))
+                        content.extend(handle_image_response(result, return_screenshot, arguments))
 
                 elif name == "sap_type":
                     logger.info(f"Typing text: {arguments['text']}")
@@ -298,7 +337,7 @@ class SapGuiServer:
                         content.append(types.TextContent(type="text", text=status_text))
                     if "image" in result:
                         logger.info("Screenshot captured in response")
-                        content.extend(handle_image_response(result, return_screenshot))
+                        content.extend(handle_image_response(result, return_screenshot, arguments))
 
                 elif name == "sap_scroll":
                     logger.info(f"Scrolling screen: {arguments['direction']}")
@@ -311,7 +350,7 @@ class SapGuiServer:
                         content.append(types.TextContent(type="text", text=status_text))
                     if "image" in result:
                         logger.info("Screenshot captured in response")
-                        content.extend(handle_image_response(result, return_screenshot))
+                        content.extend(handle_image_response(result, return_screenshot, arguments))
                         
                 elif name == "end_transaction":
                     logger.info("Ending transaction")
@@ -332,13 +371,15 @@ class SapGuiServer:
                                 import base64
                                 from io import BytesIO
 
+                                # Get current working directory
+                                cwd = os.getcwd()
+                                full_path = os.path.join(cwd, filename)
+                                
                                 image_data = base64.b64decode(self.last_screenshot)
                                 image = Image.open(BytesIO(image_data))
-                                image.save(filename)
-                                absolute_path = os.path.abspath(filename)  # Get absolute path
-
-                                logger.info(f"Screenshot saved to {absolute_path}")
-                                content.append(types.TextContent(type="text", text=f"Screenshot saved to {absolute_path}"))
+                                image.save(full_path)
+                                logger.info(f"Screenshot saved as {full_path}")
+                                content.append(types.TextContent(type="text", text=f"Screenshot saved as {full_path}"))
                             except Exception as e:
                                 logger.error(f"Error saving screenshot: {str(e)}")
                                 content.append(types.TextContent(type="text", text=f"Error saving screenshot: {str(e)}"))

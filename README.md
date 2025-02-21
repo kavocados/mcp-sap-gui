@@ -129,13 +129,15 @@ All tools that interact with the SAP GUI window (launch_transaction, sap_click, 
 }
 ```
 
-2. `as_file`: Saves screenshot to a temporary file and returns the path
+2. `as_file`: Saves screenshot to the specified target folder and returns the path
 ```json
 {
     "type": "text",
     "text": "Screenshot saved as C:/path/to/file/screenshot.png"
 }
 ```
+
+Note: When using `as_file`, you must specify the target folder using the `as_file_target_folder` parameter. The folder will be created if it doesn't exist.
 
 3. `as_base64`: Returns the raw base64 string
 ```json
@@ -173,10 +175,11 @@ result = await client.call_tool("launch_transaction", {
     "transaction": "VA01"
 })
 
-# Save to file
+# Save to specific folder
 result = await client.call_tool("launch_transaction", {
     "transaction": "VA01",
-    "return_screenshot": "as_file"
+    "return_screenshot": "as_file",
+    "as_file_target_folder": "C:/screenshots"
 })
 
 # Get base64 string
@@ -192,16 +195,21 @@ result = await client.call_tool("launch_transaction", {
 |--------------------|-------------------|-----------|---------|----------------------------------------------------------------------------|
 | `launch_transaction`| `transaction`     | `string`  |         | SAP transaction code to launch (e.g., VA01, ME21N, MM03)                   |
 |                     | `return_screenshot`| `string`  | `none`  | Screenshot return format (`none`, `as_file`, `as_base64`, `as_imagecontent`, `as_imageurl`) |
+|                     | `as_file_target_folder`| `string`  |         | Target folder path for saving screenshots when using 'as_file' return format |
 | `sap_click`         | `x`               | `integer` |         | Horizontal pixel coordinate (0-1920) where the click should occur        |
 |                     | `y`               | `integer` |         | Vertical pixel coordinate (0-1080) where the click should occur          |
 |                     | `return_screenshot`| `string`  | `none`  | Screenshot return format (`none`, `as_file`, `as_base64`, `as_imagecontent`, `as_imageurl`) |
+|                     | `as_file_target_folder`| `string`  |         | Target folder path for saving screenshots when using 'as_file' return format |
 | `sap_move_mouse`    | `x`               | `integer` |         | Horizontal pixel coordinate (0-1920) to move the cursor to               |
 |                     | `y`               | `integer` |         | Vertical pixel coordinate (0-1080) to move the cursor to                 |
 |                     | `return_screenshot`| `string`  | `none`  | Screenshot return format (`none`, `as_file`, `as_base64`, `as_imagecontent`, `as_imageurl`) |
+|                     | `as_file_target_folder`| `string`  |         | Target folder path for saving screenshots when using 'as_file' return format |
 | `sap_type`          | `text`            | `string`  |         | Text to enter at the current cursor position in the SAP GUI window        |
 |                     | `return_screenshot`| `string`  | `none`  | Screenshot return format (`none`, `as_file`, `as_base64`, `as_imagecontent`, `as_imageurl`) |
+|                     | `as_file_target_folder`| `string`  |         | Target folder path for saving screenshots when using 'as_file' return format |
 | `sap_scroll`        | `direction`       | `string`  |         | Direction to scroll the screen ('up' moves content down, 'down' moves up) |
 |                     | `return_screenshot`| `string`  | `none`  | Screenshot return format (`none`, `as_file`, `as_base64`, `as_imagecontent`, `as_imageurl`) |
+|                     | `as_file_target_folder`| `string`  |         | Target folder path for saving screenshots when using 'as_file' return format |
 | `end_transaction`   |                   |           |         |                                                                            |
 | `save_last_screenshot`| `filename`        | `string`  |         | Path where the screenshot will be saved                                  |
 
