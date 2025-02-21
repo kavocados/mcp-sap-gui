@@ -2,6 +2,8 @@
 
 A Model Context Protocol (MCP) server for SAP GUI automation. This server provides tools to automate interactions with SAP GUI, enabling programmatic control of SAP transactions.
 
+![image](https://github.com/user-attachments/assets/d14fc986-7ab5-4c83-a8c4-d768e2788add)
+
 ## Requirements
 
 - Python 3.8 or higher
