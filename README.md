@@ -113,11 +113,11 @@ The MCP SAP GUI Server provides the following tools for SAP automation:
 - `sap_scroll`: Scroll the SAP GUI screen (up/down)
 
 ### Screen Capture
-- `save_last_screenshot`: Save the last captured screenshot of the SAP GUI window
+- `save_last_screenshot`: Save the last captured screenshot of the SAP GUI window. Returns the absolute file path of the saved image.
 
 ### Image Response Formats
 
-All tools that interact with the SAP GUI window (launch_transaction, sap_click, sap_move_mouse, sap_type, sap_scroll, save_last_screenshot) return screenshots and support two response formats controlled by the `experimental` boolean parameter:
+All tools that interact with the SAP GUI window (launch_transaction, sap_click, sap_move_mouse, sap_type, sap_scroll) return screenshots and support two response formats controlled by the `experimental` boolean parameter.  A new `include_screenshot` parameter (default: `false`) controls whether a screenshot is included in the response.
 
 1. Industry Standard Format, used in Cline, Claude, Grok AI, etc. (Default, `experimental=false`):
 ```json
@@ -152,7 +152,32 @@ result = await client.call_tool("launch_transaction", {
 })
 ```
 
-Note: The `experimental` parameter is a boolean toggle, not a string. Use `true`/`false` in JSON or `True`/`False` in Python.
+Note: The `experimental` and `include_screenshot` parameters are boolean toggles, not strings. Use `true`/`false` in JSON or `True`/`False` in Python.
+
+**Tool Parameter Summary:**
+
+| Tool                | Parameter             | Type      | Default | Description                                                                |
+|---------------------|-----------------------|-----------|---------|----------------------------------------------------------------------------|
+| `launch_transaction`| `transaction`         | `string`  |         | SAP transaction code to launch (e.g., VA01, ME21N, MM03)                   |
+|                     | `experimental`        | `boolean` | `false` | Use experimental MCP format for screenshot response                       |
+|                     | `include_screenshot` | `boolean` | `false` | Whether to include a screenshot in the response                            |
+| `sap_click`         | `x`                   | `integer` |         | Horizontal pixel coordinate (0-1920) where the click should occur        |
+|                     | `y`                   | `integer` |         | Vertical pixel coordinate (0-1080) where the click should occur          |
+|                     | `experimental`        | `boolean` | `false` | Use experimental MCP format for screenshot response                       |
+|                     | `include_screenshot` | `boolean` | `false` | Whether to include a screenshot in the response                            |
+| `sap_move_mouse`    | `x`                   | `integer` |         | Horizontal pixel coordinate (0-1920) to move the cursor to               |
+|                     | `y`                   | `integer` |         | Vertical pixel coordinate (0-1080) to move the cursor to                 |
+|                     | `experimental`        | `boolean` | `false` | Use experimental MCP format for screenshot response                       |
+|                     | `include_screenshot` | `boolean` | `false` | Whether to include a screenshot in the response                            |
+| `sap_type`          | `text`                | `string`  |         | Text to enter at the current cursor position in the SAP GUI window        |
+|                     | `experimental`        | `boolean` | `false` | Use experimental MCP format for screenshot response                       |
+|                     | `include_screenshot` | `boolean` | `false` | Whether to include a screenshot in the response                            |
+| `sap_scroll`        | `direction`           | `string`  |         | Direction to scroll the screen ('up' moves content down, 'down' moves up) |
+|                     | `experimental`        | `boolean` | `false` | Use experimental MCP format for screenshot response                       |
+|                     | `include_screenshot` | `boolean` | `false` | Whether to include a screenshot in the response                            |
+| `end_transaction`   |                       |           |         |                                                                            |
+| `save_last_screenshot`| `filename`            | `string`  |         | Path where the screenshot will be saved                                  |
+|                     | `experimental`        | `boolean` | `false` | Use experimental MCP format for screenshot response                       |
 
 ## Development
 

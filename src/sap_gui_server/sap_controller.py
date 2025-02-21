@@ -221,10 +221,9 @@ def _find_sap_window_integrated(process_pid: int) -> bool:
     logger.warning("Window search timed out after 5 seconds")
     return False
 
-# Load environment variables from .env
-env_path = os.path.join(os.path.dirname(__file__), '.env')
-if not load_dotenv(env_path):
-    logger.warning(f"No .env file found at {env_path}")
+# Load environment variables
+load_dotenv()
+
 
 class SapController:
     # Common SAP GUI UI elements to filter out
