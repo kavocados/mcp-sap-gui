@@ -40,16 +40,42 @@ class SapGuiServer:
     def _setup_handlers(self):
         """Set up request handlers for MCP tools"""
         
-        def handle_image_response(result, experimental=False):
-            """Handle image response based on experimental flag"""
-            if experimental:
-                # Return sequence of content objects
-                return [
-                    types.ImageContent(type="image", data=result["image"], mimeType="image/png"),
-                    types.TextContent(type="text", text=f"data:image/png;base64,{result['image']}")  # Raw base64
-                ]
-            else:
-                # Return sequence with embedded resource
+        def handle_image_response(result, return_screenshot="none"):
+            """Handle image response based on return_screenshot mode"""
+            # Validate return_screenshot parameter
+            valid_modes = ["none", "as_file", "as_base64", "as_imagecontent", "as_imageurl"]
+            if return_screenshot not in valid_modes:
+                logger.error(f"Invalid return_screenshot mode: {return_screenshot}")
+                return [types.TextContent(type="text", text=f"Error: Invalid return_screenshot mode. Must be one of: {', '.join(valid_modes)}")]
+            
+            if not result.get("image"):
+                return []
+                
+            self.last_screenshot = result["image"]
+            
+            if return_screenshot == "none":
+                return []
+            elif return_screenshot == "as_file":
+                # Save to temp file and return path
+                import tempfile
+                temp_dir = tempfile.gettempdir()
+                filename = os.path.join(temp_dir, "sap_screenshot.png")
+                
+                from PIL import Image
+                import base64
+                from io import BytesIO
+                
+                image_data = base64.b64decode(result["image"])
+                image = Image.open(BytesIO(image_data))
+                image.save(filename)
+                absolute_path = os.path.abspath(filename)
+                
+                return [types.TextContent(type="text", text=f"Screenshot saved as {absolute_path}")]
+            elif return_screenshot == "as_base64":
+                return [types.TextContent(type="text", text=result["image"])]
+            elif return_screenshot == "as_imagecontent":
+                return [types.ImageContent(type="image", data=result["image"], mimeType="image/png")]
+            elif return_screenshot == "as_imageurl":
                 return [
                     types.EmbeddedResource(
                         type="resource",
@@ -59,19 +85,18 @@ class SapGuiServer:
                             text=f"data:image/png;base64,{result['image']}"
                         )
                     )
-                ]                                            
-                # )
-                # else:
-                
-                # # Industry standard format
-                # return [{
-                #     "type": "image_url",
-                #     "data": {"url": f"data:image/png;base64,{result['image']}"},
-                #     "mimeType": "image/png"
-                # }]
+                ]
+            return []
 
         # Define handlers
         async def handle_list_tools() -> list[types.Tool]:
+            screenshot_schema = {
+                "type": "string",
+                "description": "Screenshot return format",
+                "enum": ["none", "as_file", "as_base64", "as_imagecontent", "as_imageurl"],
+                "default": "none"
+            }
+            
             return [
                 types.Tool(
                     name="launch_transaction",
@@ -83,16 +108,7 @@ class SapGuiServer:
                                 "type": "string",
                                 "description": "SAP transaction code to launch (e.g. VA01, ME21N, MM03)"
                             },
-                            "experimental": {
-                                "type": "boolean",
-                                "description": "Use experimental MCP format for screenshot response",
-                                "default": False
-                            },
-                            "include_screenshot": {
-                                "type": "boolean",
-                                "description": "Whether to include a screenshot in the response",
-                                "default": False
-                            }
+                            "return_screenshot": screenshot_schema
                         },
                         "required": ["transaction"]
                     }
@@ -111,16 +127,7 @@ class SapGuiServer:
                                 "type": "integer",
                                 "description": "Vertical pixel coordinate (0-1080) where the click should occur"
                             },
-                            "experimental": {
-                                "type": "boolean",
-                                "description": "Use experimental MCP format for screenshot response",
-                                "default": False
-                            },
-                            "include_screenshot": {
-                                "type": "boolean",
-                                "description": "Whether to include a screenshot in the response",
-                                "default": False
-                            }
+                            "return_screenshot": screenshot_schema
                         },
                         "required": ["x", "y"]
                     }
@@ -139,16 +146,7 @@ class SapGuiServer:
                                 "type": "integer",
                                 "description": "Vertical pixel coordinate (0-1080) to move the cursor to"
                             },
-                            "experimental": {
-                                "type": "boolean",
-                                "description": "Use experimental MCP format for screenshot response",
-                                "default": False
-                            },
-                            "include_screenshot": {
-                                "type": "boolean",
-                                "description": "Whether to include a screenshot in the response",
-                                "default": False
-                            }
+                            "return_screenshot": screenshot_schema
                         },
                         "required": ["x", "y"]
                     }
@@ -163,16 +161,7 @@ class SapGuiServer:
                                 "type": "string",
                                 "description": "Text to enter at the current cursor position in the SAP GUI window"
                             },
-                            "experimental": {
-                                "type": "boolean",
-                                "description": "Use experimental MCP format for screenshot response",
-                                "default": False
-                            },
-                            "include_screenshot": {
-                                "type": "boolean",
-                                "description": "Whether to include a screenshot in the response",
-                                "default": False
-                            }
+                            "return_screenshot": screenshot_schema
                         },
                         "required": ["text"]
                     }
@@ -188,16 +177,7 @@ class SapGuiServer:
                                 "enum": ["up", "down"],
                                 "description": "Direction to scroll the screen ('up' moves content down, 'down' moves content up)"
                             },
-                            "experimental": {
-                                "type": "boolean",
-                                "description": "Use experimental MCP format for screenshot response",
-                                "default": False
-                            },
-                            "include_screenshot": {
-                                "type": "boolean",
-                                "description": "Whether to include a screenshot in the response",
-                                "default": False
-                            }
+                            "return_screenshot": screenshot_schema
                         },
                         "required": ["direction"]
                     }
@@ -219,11 +199,6 @@ class SapGuiServer:
                             "filename": {
                                 "type": "string",
                                 "description": "Path where the screenshot will be saved (e.g. 'screenshot.png', supports PNG, JPG, BMP formats)"
-                            },
-                            "experimental": {
-                                "type": "boolean",
-                                "description": "Use experimental MCP format for screenshot response",
-                                "default": False
                             }
                         },
                         "required": ["filename"]
@@ -240,6 +215,14 @@ class SapGuiServer:
                 sap = self.get_sap_controller()
 
                 content = []  # Initialize content list
+                return_screenshot = arguments.get("return_screenshot", "none")
+                
+                # Validate return_screenshot parameter
+                valid_modes = ["none", "as_file", "as_base64", "as_imagecontent", "as_imageurl"]
+                if return_screenshot not in valid_modes:
+                    error_msg = f"Invalid return_screenshot mode. Must be one of: {', '.join(valid_modes)}"
+                    logger.error(error_msg)
+                    return [types.TextContent(type="text", text=f"Error: {error_msg}")]
 
                 if name == "launch_transaction":
                     logger.info(f"Launching transaction: {arguments['transaction']}")
@@ -266,12 +249,10 @@ class SapGuiServer:
                         logger.info(f"Field values detected: {fields_text}")
                         content.append(types.TextContent(type="text", text=fields_text))
 
-                    # Add screenshot if requested
-                    if arguments.get("include_screenshot", False) and "image" in result and result["image"]:
+                    # Add screenshot based on return mode
+                    if "image" in result:
                         logger.info("Screenshot captured in response")
-                        self.last_screenshot = result["image"]
-                        experimental = arguments.get("experimental", False)
-                        content.extend(handle_image_response(result, experimental))
+                        content.extend(handle_image_response(result, return_screenshot))
 
                 elif name == "sap_click":
                     # Extract and validate coordinates
@@ -289,11 +270,9 @@ class SapGuiServer:
                             status_text += f"\\n{result['message']}"
                         logger.info(f"Tool execution result - {status_text}")
                         content.append(types.TextContent(type="text", text=status_text))
-                    if arguments.get("include_screenshot", False) and "image" in result and result["image"]:
+                    if "image" in result:
                         logger.info("Screenshot captured in response")
-                        self.last_screenshot = result["image"]
-                        experimental = arguments.get("experimental", False)
-                        content.extend(handle_image_response(result, experimental))
+                        content.extend(handle_image_response(result, return_screenshot))
 
                 elif name == "sap_move_mouse":
                     logger.info(f"Moving mouse to: ({arguments['x']}, {arguments['y']})")
@@ -304,11 +283,10 @@ class SapGuiServer:
                             status_text += f"\\n{result['message']}"
                         logger.info(f"Tool execution result - {status_text}")
                         content.append(types.TextContent(type="text", text=status_text))
-                    if arguments.get("include_screenshot", False) and "image" in result and result["image"]:
+                    if "image" in result:
                         logger.info("Screenshot captured in response")
-                        self.last_screenshot = result["image"]
-                        experimental = arguments.get("experimental", False)
-                        content.extend(handle_image_response(result, experimental))
+                        content.extend(handle_image_response(result, return_screenshot))
+
                 elif name == "sap_type":
                     logger.info(f"Typing text: {arguments['text']}")
                     result = sap.type_text(arguments["text"])
@@ -318,11 +296,9 @@ class SapGuiServer:
                             status_text += f"\\n{result['message']}"
                         logger.info(f"Tool execution result - {status_text}")
                         content.append(types.TextContent(type="text", text=status_text))
-                    if arguments.get("include_screenshot", False) and "image" in result and result["image"]:
+                    if "image" in result:
                         logger.info("Screenshot captured in response")
-                        self.last_screenshot = result["image"]
-                        experimental = arguments.get("experimental", False)
-                        content.extend(handle_image_response(result, experimental))
+                        content.extend(handle_image_response(result, return_screenshot))
 
                 elif name == "sap_scroll":
                     logger.info(f"Scrolling screen: {arguments['direction']}")
@@ -333,11 +309,9 @@ class SapGuiServer:
                             status_text += f"\\n{result['message']}"
                         logger.info(f"Tool execution result - {status_text}")
                         content.append(types.TextContent(type="text", text=status_text))
-                    if arguments.get("include_screenshot", False) and "image" in result and result["image"]:
+                    if "image" in result:
                         logger.info("Screenshot captured in response")
-                        self.last_screenshot = result["image"]
-                        experimental = arguments.get("experimental", False)
-                        content.extend(handle_image_response(result, experimental))
+                        content.extend(handle_image_response(result, return_screenshot))
                         
                 elif name == "end_transaction":
                     logger.info("Ending transaction")
