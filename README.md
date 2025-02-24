@@ -12,10 +12,11 @@ A Model Context Protocol (MCP) server for SAP GUI automation. This server provid
 - Node.js (for npx)
 
 ## Installation
-0. Automated Install using setup script:
+0. Clone github folder and run the automated Install using setup script:
 ```
 ./setup.bat
 ```
+This will guide you through the build process and will integrate this directly in Cline or Roo, if you select so.
 
 1. OR Manual Install using build script..:
 ```bash
