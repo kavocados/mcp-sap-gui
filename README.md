@@ -24,7 +24,7 @@ build.bat
 ```
 
 2. Configure SAP credentials:
-- Copy `credentials.env.example` to `.env`
+- Copy `.env.example` to `.env`
 - Update the values with your SAP credentials
 
 3. Test server using mcp inspector:
