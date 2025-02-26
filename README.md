@@ -14,13 +14,13 @@ A Model Context Protocol (MCP) server for SAP GUI automation. This server provid
 ## Installation
 0. Clone github folder and run the automated Install using setup script:
 ```
-./setup.bat
+setup.bat
 ```
 This will guide you through the build process and will integrate this directly in Cline or Roo, if you select so.
 
 1. OR Manual Install using build script..:
 ```bash
-./build.bat
+build.bat
 ```
 
 2. Configure SAP credentials:
@@ -29,13 +29,13 @@ This will guide you through the build process and will integrate this directly i
 
 3. Test server using mcp inspector:
 ```bash
-./run.bat debug
+run.bat debug
 ```
 
 4. Use the integration script to automatically configure MCP settings:
 ```bash
-./integrate.bat cline  # Configure for Cline
-./integrate.bat roo    # Configure for Roo
+integrate.bat cline  # Configure for Cline
+integrate.bat roo    # Configure for Roo
 ```
 
 The script will:
