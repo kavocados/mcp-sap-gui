@@ -12,15 +12,17 @@ A Model Context Protocol (MCP) server for SAP GUI automation. This server provid
 - Node.js (for npx)
 
 ## Installation
-0. Clone github folder and run the automated Install using setup script:
+0. Clone github folder and run the automated Install using the setup script for your platform:
 ```
-setup.bat
+Windows: setup.bat
+macOS:   ./setup.sh
 ```
 This will guide you through the build process and will integrate this directly in Cline or Roo, if you select so.
 
-1. OR Manual Install using build script..:
+1. OR Manual Install using the build script:
 ```bash
-build.bat
+Windows: build.bat
+macOS:   ./build.sh
 ```
 
 2. Configure SAP credentials:
@@ -29,13 +31,16 @@ build.bat
 
 3. Test server using mcp inspector:
 ```bash
-run.bat debug
+Windows: run.bat debug
+macOS:   ./run.sh debug
 ```
 
 4. Use the integration script to automatically configure MCP settings:
 ```bash
-integrate.bat cline  # Configure for Cline
-integrate.bat roo    # Configure for Roo
+Windows: integrate.bat cline  # Configure for Cline
+Windows: integrate.bat roo    # Configure for Roo
+macOS:   ./integrate.sh cline
+macOS:   ./integrate.sh roo
 ```
 
 The script will:
@@ -220,7 +225,8 @@ result = await client.call_tool("launch_transaction", {
 
 1. Test server using mcp inspector (build + debug):
 ```bash
-./run.bat full
+Windows: ./run.bat full
+macOS:   ./run.sh full
 ```
 
 2. Or use test suite:
@@ -228,7 +234,8 @@ The test suite includes live tests that interact with SAP GUI. Make sure you hav
 
 Run tests:
 ```bash
-run.bat test server
+Windows: run.bat test server
+macOS:   ./run.sh test server
 ```
 
 The test suite includes:
@@ -251,8 +258,8 @@ mcp-sap-gui/
 │   ├── __init__.py
 │   ├── test_sap_controller.py
 │   └── test_server.py
-├── build.bat          # Build and test script
-├── integrate.bat      # Integration script for Cline/Roo
+├── build.bat / build.sh          # Build and test script
+├── integrate.bat / integrate.sh  # Integration script for Cline/Roo
 ├── integrate.py       # Python script for safe MCP settings updates
 ├── requirements.txt   # Production dependencies
 └── requirements-dev.txt  # Development dependencies
